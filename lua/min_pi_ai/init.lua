@@ -407,71 +407,44 @@ local function run_pi(region, request, model, thinking)
   vim.fn.chanclose(job, "stdin")
 end
 
-local function parse_prompt(buf)
-  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+local function parse_request(buf)
   local body = {}
-  local model = M.config.default_model
-  local thinking = M.config.default_thinking
-  local reading_body = false
-  local saw_field = false
 
-  for _, line in ipairs(lines) do
+  -- Header/status lines start with # and are not sent as user instructions.
+
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
     if not line:match("^%s*#") then
-      local key, value = line:match("^%s*([%w_-]+)%s*:%s*(.-)%s*$")
-
-      if not reading_body and key then
-        key = key:lower()
-        if key == "model" then
-          model = value
-          saw_field = true
-        elseif key == "thinking" then
-          thinking = value
-          saw_field = true
-        else
-          table.insert(body, line)
-          reading_body = true
-        end
-      elseif not reading_body and saw_field and line:match("^%s*$") then
-        reading_body = true
-      elseif reading_body then
-        table.insert(body, line)
-      elseif not line:match("^%s*$") then
-        table.insert(body, line)
-        reading_body = true
-      end
+      table.insert(body, line)
     end
   end
 
-  body = trim_blank_lines(body)
-
-  return {
-    model = trim(model or ""),
-    thinking = trim(thinking or ""),
-    request = table.concat(body, "\n"),
-  }
+  return table.concat(trim_blank_lines(body), "\n")
 end
 
-local function replace_field_line(buf, key, value)
-  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-  local prefix = key .. ":"
+local function prompt_status_line(state)
+  -- A comment line keeps model/thinking visible without making them editable fields.
+  return "# model: " .. state.model .. " | thinking: " .. state.thinking
+end
 
-  for index, line in ipairs(lines) do
-    if line:lower():match("^%s*" .. key .. "%s*:") then
-      vim.api.nvim_buf_set_lines(buf, index - 1, index, false, { prefix .. " " .. value })
-      return
-    end
+local function update_prompt_status(state)
+  if vim.api.nvim_buf_is_valid(state.buf) then
+    vim.api.nvim_buf_set_lines(
+      state.buf,
+      state.status_row,
+      state.status_row + 1,
+      false,
+      { prompt_status_line(state) }
+    )
   end
-
-  vim.api.nvim_buf_set_lines(buf, 0, 0, false, { prefix .. " " .. value })
 end
 
-local function refocus_prompt(buf)
-  if not vim.api.nvim_buf_is_valid(buf) then
+local function refocus_prompt(state)
+  if not vim.api.nvim_buf_is_valid(state.buf) then
     return
   end
 
   for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == state.buf then
       pcall(vim.api.nvim_set_current_win, win)
       vim.cmd("startinsert")
       return
@@ -479,12 +452,13 @@ local function refocus_prompt(buf)
   end
 end
 
-local function select_thinking(buf)
+local function select_thinking(state)
   vim.ui.select(thinking_choices, { prompt = "Pi thinking" }, function(choice)
-    if choice and vim.api.nvim_buf_is_valid(buf) then
+    if choice and vim.api.nvim_buf_is_valid(state.buf) then
+      state.thinking = choice
       M._session_thinking = choice
-      replace_field_line(buf, "thinking", choice)
-      refocus_prompt(buf)
+      update_prompt_status(state)
+      refocus_prompt(state)
     end
   end)
 end
@@ -504,7 +478,7 @@ local function parse_models(output)
   return choices
 end
 
-local function select_model(buf)
+local function select_model(state)
   if not executable_pi() then
     return
   end
@@ -543,10 +517,11 @@ local function select_model(buf)
         end
 
         vim.ui.select(choices, { prompt = "Pi model" }, function(choice)
-          if choice and vim.api.nvim_buf_is_valid(buf) then
+          if choice and vim.api.nvim_buf_is_valid(state.buf) then
+            state.model = choice
             M._session_model = choice
-            replace_field_line(buf, "model", choice)
-            refocus_prompt(buf)
+            update_prompt_status(state)
+            refocus_prompt(state)
           end
         end)
       end)
@@ -590,19 +565,19 @@ local function submit_prompt(state)
     return
   end
 
-  local parsed = parse_prompt(state.buf)
-  if parsed.request == "" then
+  local request = parse_request(state.buf)
+  if request == "" then
     notify("Describe the change before submitting.", vim.log.levels.WARN)
     return
   end
 
   -- In-memory only: this resets when the current Neovim process exits.
-  M._session_model = parsed.model ~= "" and parsed.model or nil
-  M._session_thinking = parsed.thinking ~= "" and parsed.thinking or nil
+  M._session_model = state.model
+  M._session_thinking = state.thinking
 
   state.submitted = true
   close_prompt(state)
-  run_pi(state.region, parsed.request, parsed.model, parsed.thinking)
+  run_pi(state.region, request, state.model, state.thinking)
 end
 
 local function open_prompt(region)
@@ -623,14 +598,20 @@ local function open_prompt(region)
     title_pos = "center",
   })
 
-  local model = M._session_model or M.config.default_model
-  local thinking = M._session_thinking or M.config.default_thinking
+  local state = {
+    buf = buf,
+    win = win,
+    region = region,
+    submitted = false,
+    model = M._session_model or M.config.default_model,
+    thinking = M._session_thinking or M.config.default_thinking,
+    status_row = 2,
+  }
+
   local lines = {
     "# Describe how Pi should rewrite the selected text.",
-    "# Lines beginning with # are ignored.",
     "# <C-s> submit | <C-l> model | <C-t> thinking | normal <CR> submit | q cancel",
-    "model: " .. model,
-    "thinking: " .. thinking,
+    prompt_status_line(state),
     "",
     "",
   }
@@ -649,7 +630,6 @@ local function open_prompt(region)
     pcall(vim.diagnostic.disable, buf)
   end
 
-  local state = { buf = buf, win = win, region = region, submitted = false }
   local keymap_opts = { buffer = buf, silent = true, nowait = true }
 
   vim.keymap.set({ "n", "i" }, "<C-s>", function()
@@ -657,11 +637,11 @@ local function open_prompt(region)
   end, keymap_opts)
 
   vim.keymap.set({ "n", "i" }, "<C-l>", function()
-    select_model(buf)
+    select_model(state)
   end, keymap_opts)
 
   vim.keymap.set({ "n", "i" }, "<C-t>", function()
-    select_thinking(buf)
+    select_thinking(state)
   end, keymap_opts)
 
   vim.keymap.set("n", "<CR>", function()

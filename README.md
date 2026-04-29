@@ -74,9 +74,9 @@ return {
 
 In the popup:
 
-- edit `model:` to use another Pi model;
-- press `<C-l>` to select from `pi --list-models gpt`;
-- edit `thinking:` or press `<C-t>` to change the reasoning level;
+- type the requested change in the body;
+- press `<C-l>` to select a model from `pi --list-models gpt`;
+- press `<C-t>` to select the thinking level;
 - press normal mode `<CR>` to submit;
 - press normal mode `q` or `<Esc>` to cancel.
 
