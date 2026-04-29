@@ -465,11 +465,26 @@ local function replace_field_line(buf, key, value)
   vim.api.nvim_buf_set_lines(buf, 0, 0, false, { prefix .. " " .. value })
 end
 
+local function refocus_prompt(buf)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
+      pcall(vim.api.nvim_set_current_win, win)
+      vim.cmd("startinsert")
+      return
+    end
+  end
+end
+
 local function select_thinking(buf)
   vim.ui.select(thinking_choices, { prompt = "Pi thinking" }, function(choice)
     if choice and vim.api.nvim_buf_is_valid(buf) then
       M._session_thinking = choice
       replace_field_line(buf, "thinking", choice)
+      refocus_prompt(buf)
     end
   end)
 end
@@ -531,6 +546,7 @@ local function select_model(buf)
           if choice and vim.api.nvim_buf_is_valid(buf) then
             M._session_model = choice
             replace_field_line(buf, "model", choice)
+            refocus_prompt(buf)
           end
         end)
       end)
