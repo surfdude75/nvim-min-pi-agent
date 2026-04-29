@@ -83,6 +83,9 @@ In the popup:
 If `<C-s>` is captured by your terminal, use normal mode `<CR>` instead.
 The success or failure notification includes the elapsed Pi request time.
 
+The plugin remembers the last model and thinking value only in the current
+Neovim process. Restarting Neovim resets them to the configured defaults.
+
 ## Commands
 
 - `:MinPiAIEditSelection` edits the current visual selection.

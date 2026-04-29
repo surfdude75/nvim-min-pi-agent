@@ -438,6 +438,7 @@ end
 local function select_thinking(buf)
   vim.ui.select(thinking_choices, { prompt = "Pi thinking" }, function(choice)
     if choice and vim.api.nvim_buf_is_valid(buf) then
+      M._session_thinking = choice
       replace_field_line(buf, "thinking", choice)
     end
   end)
@@ -498,6 +499,7 @@ local function select_model(buf)
 
         vim.ui.select(choices, { prompt = "Pi model" }, function(choice)
           if choice and vim.api.nvim_buf_is_valid(buf) then
+            M._session_model = choice
             replace_field_line(buf, "model", choice)
           end
         end)
@@ -544,6 +546,10 @@ local function submit_prompt(state)
     return
   end
 
+  -- In-memory only: this resets when the current Neovim process exits.
+  M._session_model = parsed.model ~= "" and parsed.model or nil
+  M._session_thinking = parsed.thinking ~= "" and parsed.thinking or nil
+
   state.submitted = true
   close_prompt(state)
   run_pi(state.region, parsed.request, parsed.model, parsed.thinking)
@@ -567,12 +573,14 @@ local function open_prompt(region)
     title_pos = "center",
   })
 
+  local model = M._session_model or M.config.default_model
+  local thinking = M._session_thinking or M.config.default_thinking
   local lines = {
     "# Describe how Pi should rewrite the selected text.",
     "# Lines beginning with # are ignored.",
     "# <C-s> submit | <C-l> model | <C-t> thinking | normal <CR> submit | q cancel",
-    "model: " .. M.config.default_model,
-    "thinking: " .. M.config.default_thinking,
+    "model: " .. model,
+    "thinking: " .. thinking,
     "",
     "",
   }
