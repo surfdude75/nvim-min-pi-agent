@@ -48,7 +48,7 @@ Create a plugin spec such as
 return {
   {
     "surfdude75/nvim-min-pi-agent",
-    main = "min_pi_ai",
+    main = "min_pi_agent",
     opts = {
       default_model = "openai-codex/gpt-5.5",
       default_thinking = "medium",
@@ -56,7 +56,7 @@ return {
     keys = {
       {
         "<leader>as",
-        ":<C-u>MinPiAIEditSelection<CR>",
+        ":<C-u>MinPiAgentEditSelection<CR>",
         mode = "x",
         desc = "Pi edit selection",
       },
@@ -86,20 +86,23 @@ The success or failure notification includes the elapsed Pi request time.
 The plugin remembers the last model and thinking value only in the current
 Neovim process. Restarting Neovim resets them to the configured defaults.
 
+If the original buffer changes while Pi is working, the replacement is
+cancelled. This avoids applying stale output over text that you already edited.
+
 ## Commands
 
-- `:MinPiAIEditSelection` edits the current visual selection.
-- `:MinPiAICheck` checks that the `pi` command is available.
-- `:MinPiAILogin` opens Pi in a terminal split so you can run `/login`.
-- `:MinPiAILogCommand on` logs the exact Pi command before each request.
-- `:MinPiAIShowLastCommand` prints the last Pi command again.
+- `:MinPiAgentEditSelection` edits the current visual selection.
+- `:MinPiAgentCheck` checks that the `pi` command is available.
+- `:MinPiAgentLogin` opens Pi in a terminal split so you can run `/login`.
+- `:MinPiAgentLogCommand on` logs the exact Pi command before each request.
+- `:MinPiAgentShowLastCommand` prints the last Pi command again.
 
 ## Configuration
 
 Default options:
 
 ```lua
-require("min_pi_ai").setup({
+require("min_pi_agent").setup({
   default_model = "openai-codex/gpt-5.5",
   default_thinking = "medium",
   pi_cmd = "pi",
@@ -118,7 +121,7 @@ lines sent before the request and selected text. Do not add it unless you want
 to customize the agent behavior.
 
 ```lua
-require("min_pi_ai").setup({
+require("min_pi_agent").setup({
   agent_prompt = {
     "Rewrite only the selected text.",
     "Return replacement text only.",
@@ -135,7 +138,7 @@ provider you have not authenticated, such as Azure OpenAI. If Pi lists your
 desired model with a provider prefix, use that exact value. For example:
 
 ```lua
-require("min_pi_ai").setup({
+require("min_pi_agent").setup({
   default_model = "openai-codex/gpt-5.5",
 })
 ```
@@ -143,7 +146,7 @@ require("min_pi_ai").setup({
 You can also set the visual keymap from setup:
 
 ```lua
-require("min_pi_ai").setup({
+require("min_pi_agent").setup({
   keymap = "<leader>as",
 })
 ```
@@ -175,13 +178,13 @@ selected model provider.
 To compare the command used by the default model and the model picker, run:
 
 ```vim
-:MinPiAILogCommand on
+:MinPiAgentLogCommand on
 ```
 
 Then try both flows and inspect `:messages`. You can also rerun:
 
 ```vim
-:MinPiAIShowLastCommand
+:MinPiAgentShowLastCommand
 ```
 
 ## Current limits

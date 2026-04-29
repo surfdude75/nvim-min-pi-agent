@@ -14,7 +14,7 @@ Pi. Keep the code small, readable, and easy to audit.
 ## Code style
 
 - Write Lua for the plugin.
-- Keep public functions in `lua/min_pi_ai/init.lua` simple.
+- Keep public functions in `lua/min_pi_agent/init.lua` simple.
 - Avoid background state unless it is necessary for an active request.
 - Preserve the default model and thinking options unless asked to change them.
 - Do not add network code outside calls to the `pi` executable.
@@ -26,8 +26,8 @@ After changing Lua files, run:
 ```sh
 nvim --headless -u NONE \
   -c 'set rtp+=.' \
-  -c 'runtime plugin/min_pi_ai.lua' \
-  -c 'lua require("min_pi_ai")' \
+  -c 'runtime plugin/min_pi_agent.lua' \
+  -c 'lua require("min_pi_agent")' \
   -c 'qa'
 ```
 

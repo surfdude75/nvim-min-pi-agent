@@ -40,7 +40,7 @@ local thinking_levels = {
 }
 
 local function notify(message, level)
-  vim.notify(message, level or vim.log.levels.INFO, { title = "min-pi-ai" })
+  vim.notify(message, level or vim.log.levels.INFO, { title = "min-pi-agent" })
 end
 
 local function trim(text)
@@ -331,7 +331,7 @@ local function remember_command(cmd)
 
   if M.config.log_cmd then
     notify("Pi command:\n" .. M._last_cmd)
-    print("[min-pi-ai] Pi command: " .. M._last_cmd)
+    print("[min-pi-agent] Pi command: " .. M._last_cmd)
   end
 end
 
@@ -648,8 +648,8 @@ local function open_prompt(region)
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "wipe"
   vim.bo[buf].swapfile = false
-  vim.bo[buf].filetype = "min_pi_ai_prompt"
-  vim.b[buf].min_pi_ai_prompt = true
+  vim.bo[buf].filetype = "min_pi_agent_prompt"
+  vim.b[buf].min_pi_agent_prompt = true
 
   -- Do not let Markdown linters/LSP attach to this temporary prompt buffer.
   if vim.diagnostic and vim.diagnostic.enable then
@@ -713,7 +713,7 @@ function M.check()
     return
   end
 
-  notify("Found pi " .. version .. ". Run :MinPiAILogin if authentication is needed.")
+  notify("Found pi " .. version .. ". Run :MinPiAgentLogin if authentication is needed.")
 end
 
 function M.login()
@@ -735,7 +735,7 @@ function M.show_last_command()
   end
 
   notify("Last Pi command:\n" .. M._last_cmd)
-  print("[min-pi-ai] Last Pi command: " .. M._last_cmd)
+  print("[min-pi-agent] Last Pi command: " .. M._last_cmd)
 end
 
 function M.set_command_logging(value)
@@ -746,7 +746,7 @@ function M.set_command_logging(value)
   elseif value == "off" or value == "false" or value == "0" then
     M.config.log_cmd = false
   else
-    notify("Usage: :MinPiAILogCommand [on|off|toggle]", vim.log.levels.WARN)
+    notify("Usage: :MinPiAgentLogCommand [on|off|toggle]", vim.log.levels.WARN)
     return
   end
 
@@ -765,23 +765,23 @@ function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config or vim.deepcopy(defaults), opts)
   M._setup_done = true
 
-  vim.api.nvim_create_user_command("MinPiAIEditSelection", function()
+  vim.api.nvim_create_user_command("MinPiAgentEditSelection", function()
     M.edit_selection()
   end, { desc = "Rewrite the visual selection with Pi", range = true, force = true })
 
-  vim.api.nvim_create_user_command("MinPiAICheck", function()
+  vim.api.nvim_create_user_command("MinPiAgentCheck", function()
     M.check()
   end, { desc = "Check that the Pi CLI is available", force = true })
 
-  vim.api.nvim_create_user_command("MinPiAILogin", function()
+  vim.api.nvim_create_user_command("MinPiAgentLogin", function()
     M.login()
   end, { desc = "Open Pi so you can run /login", force = true })
 
-  vim.api.nvim_create_user_command("MinPiAIShowLastCommand", function()
+  vim.api.nvim_create_user_command("MinPiAgentShowLastCommand", function()
     M.show_last_command()
   end, { desc = "Show the last Pi CLI command", force = true })
 
-  vim.api.nvim_create_user_command("MinPiAILogCommand", function(args)
+  vim.api.nvim_create_user_command("MinPiAgentLogCommand", function(args)
     M.set_command_logging(args.args)
   end, {
     complete = function()
@@ -796,7 +796,7 @@ function M.setup(opts)
     vim.keymap.set(
       "x",
       M.config.keymap,
-      ":<C-u>MinPiAIEditSelection<CR>",
+      ":<C-u>MinPiAgentEditSelection<CR>",
       { desc = "Pi edit selection" }
     )
   end
