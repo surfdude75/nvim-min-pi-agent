@@ -639,7 +639,15 @@ local function open_prompt(region)
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "wipe"
   vim.bo[buf].swapfile = false
-  vim.bo[buf].filetype = "markdown"
+  vim.bo[buf].filetype = "min_pi_ai_prompt"
+  vim.b[buf].min_pi_ai_prompt = true
+
+  -- Do not let Markdown linters/LSP attach to this temporary prompt buffer.
+  if vim.diagnostic and vim.diagnostic.enable then
+    pcall(vim.diagnostic.enable, false, { bufnr = buf })
+  elseif vim.diagnostic and vim.diagnostic.disable then
+    pcall(vim.diagnostic.disable, buf)
+  end
 
   local state = { buf = buf, win = win, region = region, submitted = false }
   local keymap_opts = { buffer = buf, silent = true, nowait = true }
