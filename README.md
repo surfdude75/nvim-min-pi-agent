@@ -113,6 +113,23 @@ require("min_pi_ai").setup({
 
 Set `model_list_search = ""` if you want `<C-l>` to list all Pi models.
 
+Optional prompt customization: `agent_prompt` replaces the default instruction
+lines sent before the request and selected text. Do not add it unless you want
+to customize the agent behavior.
+
+```lua
+require("min_pi_ai").setup({
+  agent_prompt = {
+    "Rewrite only the selected text.",
+    "Return replacement text only.",
+    "Do not include Markdown fences or explanations.",
+  },
+})
+```
+
+The user request, file metadata, and selected text are still appended after
+these lines.
+
 The provider prefix matters. A bare model such as `gpt-5.5` can resolve to a
 provider you have not authenticated, such as Azure OpenAI. If Pi lists your
 desired model with a provider prefix, use that exact value. For example:

@@ -10,6 +10,8 @@ local defaults = {
   model_list_search = "gpt",
   strip_trailing_newline = true,
   log_cmd = false,
+  -- Optional string or string[] that replaces the default prompt instructions.
+  agent_prompt = nil,
   prompt_window = {
     width = 0.72,
     height = 0.38,
@@ -19,6 +21,13 @@ local defaults = {
 }
 
 M.config = vim.deepcopy(defaults)
+
+local default_agent_prompt = {
+  "You are rewriting one selected text fragment from Neovim.",
+  "Return only the replacement text for the selection.",
+  "Do not include explanations, Markdown fences, or surrounding file text.",
+  "Keep the edit scoped to the selected text.",
+}
 
 local thinking_choices = { "off", "minimal", "low", "medium", "high", "xhigh" }
 local thinking_levels = {
@@ -241,16 +250,33 @@ local function replace_selection(region, replacement, elapsed)
   notify("Selection replaced by Pi in " .. elapsed .. ".")
 end
 
+local function agent_prompt_lines()
+  local configured = M.config.agent_prompt
+  local source = default_agent_prompt
+
+  if type(configured) == "string" then
+    source = vim.split(configured, "\n", { plain = true })
+  elseif type(configured) == "table" then
+    source = configured
+  elseif configured ~= nil then
+    notify("agent_prompt must be a string or list of strings.", vim.log.levels.WARN)
+  end
+
+  local lines = {}
+  for _, line in ipairs(source) do
+    table.insert(lines, tostring(line))
+  end
+
+  return lines
+end
+
 local function build_agent_prompt(region, request)
   local file = region.filename ~= "" and region.filename or "[No Name]"
   local filetype = region.filetype ~= "" and region.filetype or "text"
   local line_range = string.format("%d-%d", region.start_row + 1, region.end_row + 1)
+  local lines = agent_prompt_lines()
 
-  return table.concat({
-    "You are rewriting one selected text fragment from Neovim.",
-    "Return only the replacement text for the selection.",
-    "Do not include explanations, Markdown fences, or surrounding file text.",
-    "Keep the edit scoped to the selected text.",
+  vim.list_extend(lines, {
     "",
     "User request:",
     request,
@@ -262,7 +288,9 @@ local function build_agent_prompt(region, request)
     "<selection>",
     region.text,
     "</selection>",
-  }, "\n")
+  })
+
+  return table.concat(lines, "\n")
 end
 
 local function clean_output(output)
