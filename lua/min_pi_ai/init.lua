@@ -2,7 +2,7 @@ local M = {}
 
 local defaults = {
   -- Keep the default broad so Pi can resolve the provider the user logged into.
-  default_model = "gpt-5.5",
+  default_model = "openai-codex/gpt-5.5",
   default_thinking = "medium",
   pi_cmd = "pi",
   extra_args = {},
