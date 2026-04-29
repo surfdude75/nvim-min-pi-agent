@@ -1,4 +1,4 @@
-# nvim-min-pi-ai
+# nvim-min-pi-agent
 
 A tiny Neovim plugin that asks the local `pi` CLI to rewrite the current
 visual selection.
@@ -42,12 +42,12 @@ export OPENAI_API_KEY=sk-...
 ## Install with LazyVim
 
 Create a plugin spec such as
-`~/.config/nvim/lua/plugins/min-pi-ai.lua`:
+`~/.config/nvim/lua/plugins/min-pi-agent.lua`:
 
 ```lua
 return {
   {
-    "your-name/nvim-min-pi-ai",
+    "surfdude75/nvim-min-pi-agent",
     main = "min_pi_ai",
     opts = {
       default_model = "gpt-5.5",
@@ -66,8 +66,6 @@ return {
   },
 }
 ```
-
-Replace `your-name/nvim-min-pi-ai` with your repository path.
 
 ## Usage
 
