@@ -87,6 +87,8 @@ If `<C-s>` is captured by your terminal, use normal mode `<CR>` instead.
 - `:MinPiAIEditSelection` edits the current visual selection.
 - `:MinPiAICheck` checks that the `pi` command is available.
 - `:MinPiAILogin` opens Pi in a terminal split so you can run `/login`.
+- `:MinPiAILogCommand on` logs the exact Pi command before each request.
+- `:MinPiAIShowLastCommand` prints the last Pi command again.
 
 ## Configuration
 
@@ -101,6 +103,7 @@ require("min_pi_ai").setup({
   keymap = nil,
   model_list_search = "gpt",
   strip_trailing_newline = true,
+  log_cmd = false,
 })
 ```
 
@@ -156,6 +159,18 @@ Pi provider before the provider you use.
 
 If you copied an older config, update your LazyVim spec so it does not override
 the plugin default with `default_model = "gpt-5.5"`.
+
+To compare the command used by the default model and the model picker, run:
+
+```vim
+:MinPiAILogCommand on
+```
+
+Then try both flows and inspect `:messages`. You can also rerun:
+
+```vim
+:MinPiAIShowLastCommand
+```
 
 ### `Make a visual selection first`
 

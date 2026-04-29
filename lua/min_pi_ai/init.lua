@@ -9,6 +9,7 @@ local defaults = {
   keymap = nil,
   model_list_search = "gpt",
   strip_trailing_newline = true,
+  log_cmd = false,
   prompt_window = {
     width = 0.72,
     height = 0.38,
@@ -232,6 +233,38 @@ local function clean_output(output)
   return output
 end
 
+local function format_command(cmd)
+  local formatted = {}
+  local redact_next = false
+
+  for _, arg in ipairs(cmd) do
+    arg = tostring(arg)
+
+    if redact_next then
+      table.insert(formatted, vim.fn.shellescape("<redacted>"))
+      redact_next = false
+    elseif arg == "--api-key" then
+      table.insert(formatted, vim.fn.shellescape(arg))
+      redact_next = true
+    elseif arg:match("^%-%-api%-key=") then
+      table.insert(formatted, vim.fn.shellescape("--api-key=<redacted>"))
+    else
+      table.insert(formatted, vim.fn.shellescape(arg))
+    end
+  end
+
+  return table.concat(formatted, " ")
+end
+
+local function remember_command(cmd)
+  M._last_cmd = format_command(cmd)
+
+  if M.config.log_cmd then
+    notify("Pi command:\n" .. M._last_cmd)
+    print("[min-pi-ai] Pi command: " .. M._last_cmd)
+  end
+end
+
 local function pi_command(model, thinking)
   local cmd = {
     M.config.pi_cmd,
@@ -274,6 +307,7 @@ local function run_pi(region, request, model, thinking)
   local prompt = build_agent_prompt(region, request)
   local cmd = pi_command(model, thinking)
 
+  remember_command(cmd)
   notify("Sending selection to Pi...")
 
   local job = vim.fn.jobstart(cmd, {
@@ -590,6 +624,31 @@ function M.login()
   notify("In the Pi terminal, type /login and choose your provider.")
 end
 
+function M.show_last_command()
+  if not M._last_cmd then
+    notify("No Pi command has been run yet.", vim.log.levels.WARN)
+    return
+  end
+
+  notify("Last Pi command:\n" .. M._last_cmd)
+  print("[min-pi-ai] Last Pi command: " .. M._last_cmd)
+end
+
+function M.set_command_logging(value)
+  if value == "" or value == "toggle" then
+    M.config.log_cmd = not M.config.log_cmd
+  elseif value == "on" or value == "true" or value == "1" then
+    M.config.log_cmd = true
+  elseif value == "off" or value == "false" or value == "0" then
+    M.config.log_cmd = false
+  else
+    notify("Usage: :MinPiAILogCommand [on|off|toggle]", vim.log.levels.WARN)
+    return
+  end
+
+  notify("Pi command logging " .. (M.config.log_cmd and "enabled." or "disabled."))
+end
+
 function M.setup(opts)
   opts = opts or {}
 
@@ -613,6 +672,21 @@ function M.setup(opts)
   vim.api.nvim_create_user_command("MinPiAILogin", function()
     M.login()
   end, { desc = "Open Pi so you can run /login", force = true })
+
+  vim.api.nvim_create_user_command("MinPiAIShowLastCommand", function()
+    M.show_last_command()
+  end, { desc = "Show the last Pi CLI command", force = true })
+
+  vim.api.nvim_create_user_command("MinPiAILogCommand", function(args)
+    M.set_command_logging(args.args)
+  end, {
+    complete = function()
+      return { "on", "off", "toggle" }
+    end,
+    desc = "Enable or disable Pi CLI command logging",
+    force = true,
+    nargs = "?",
+  })
 
   if M.config.keymap then
     vim.keymap.set(
