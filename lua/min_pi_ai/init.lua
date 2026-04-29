@@ -1,7 +1,7 @@
 local M = {}
 
 local defaults = {
-  -- Keep the default broad so Pi can resolve the provider the user logged into.
+  -- Provider-qualified so Pi does not pick another gpt-5.5 provider.
   default_model = "openai-codex/gpt-5.5",
   default_thinking = "medium",
   pi_cmd = "pi",
@@ -82,6 +82,10 @@ local function charwise_end_col(buf, row, col1)
   local char = vim.fn.strcharpart(line, char_index, 1)
 
   return math.min(#line, col0 + #char)
+end
+
+local function is_visual_mode(mode)
+  return mode == "v" or mode == "V" or mode == "\022"
 end
 
 local function get_selection()
@@ -547,6 +551,13 @@ local function open_prompt(region)
 end
 
 function M.edit_selection()
+  if is_visual_mode(vim.fn.mode()) then
+    local esc = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
+    vim.api.nvim_feedkeys(esc, "nx", false)
+    vim.schedule(M.edit_selection)
+    return
+  end
+
   local region = get_selection()
   if region then
     open_prompt(region)
@@ -580,7 +591,16 @@ function M.login()
 end
 
 function M.setup(opts)
-  M.config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
+  opts = opts or {}
+
+  -- Lazy.nvim may source plugin/ files and call setup(opts) in either order.
+  -- Do not let a later empty setup call reset user configuration.
+  if M._setup_done and next(opts) == nil then
+    return
+  end
+
+  M.config = vim.tbl_deep_extend("force", M.config or vim.deepcopy(defaults), opts)
+  M._setup_done = true
 
   vim.api.nvim_create_user_command("MinPiAIEditSelection", function()
     M.edit_selection()
@@ -595,9 +615,12 @@ function M.setup(opts)
   end, { desc = "Open Pi so you can run /login", force = true })
 
   if M.config.keymap then
-    vim.keymap.set("v", M.config.keymap, function()
-      M.edit_selection()
-    end, { desc = "Pi edit selection" })
+    vim.keymap.set(
+      "x",
+      M.config.keymap,
+      ":<C-u>MinPiAIEditSelection<CR>",
+      { desc = "Pi edit selection" }
+    )
   end
 end
 

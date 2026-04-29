@@ -50,16 +50,14 @@ return {
     "surfdude75/nvim-min-pi-agent",
     main = "min_pi_ai",
     opts = {
-      default_model = "gpt-5.5",
+      default_model = "openai-codex/gpt-5.5",
       default_thinking = "medium",
     },
     keys = {
       {
         "<leader>as",
-        function()
-          require("min_pi_ai").edit_selection()
-        end,
-        mode = "v",
+        ":<C-u>MinPiAIEditSelection<CR>",
+        mode = "x",
         desc = "Pi edit selection",
       },
     },
@@ -96,7 +94,7 @@ Default options:
 
 ```lua
 require("min_pi_ai").setup({
-  default_model = "gpt-5.5",
+  default_model = "openai-codex/gpt-5.5",
   default_thinking = "medium",
   pi_cmd = "pi",
   extra_args = {},
@@ -108,8 +106,9 @@ require("min_pi_ai").setup({
 
 Set `model_list_search = ""` if you want `<C-l>` to list all Pi models.
 
-If Pi lists your desired model with a provider prefix, use that exact value.
-For example:
+The provider prefix matters. A bare model such as `gpt-5.5` can resolve to a
+provider you have not authenticated, such as Azure OpenAI. If Pi lists your
+desired model with a provider prefix, use that exact value. For example:
 
 ```lua
 require("min_pi_ai").setup({
@@ -140,12 +139,28 @@ pi \
   --no-extensions \
   --no-skills \
   --no-prompt-templates \
-  --model gpt-5.5 \
+  --model openai-codex/gpt-5.5 \
   --thinking medium
 ```
 
 The prompt is passed on standard input. Pi then sends the prompt to the
 selected model provider.
+
+## Troubleshooting
+
+### `No API key found for azure-openai-responses`
+
+Use a provider-qualified model name, for example
+`openai-codex/gpt-5.5`. A bare model name such as `gpt-5.5` may match another
+Pi provider before the provider you use.
+
+If you copied an older config, update your LazyVim spec so it does not override
+the plugin default with `default_model = "gpt-5.5"`.
+
+### `Make a visual selection first`
+
+Use the `mode = "x"` command mapping shown above. It lets Neovim finish the
+visual selection before the plugin reads it.
 
 ## Current limits
 
