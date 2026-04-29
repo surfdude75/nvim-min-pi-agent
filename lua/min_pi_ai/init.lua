@@ -20,6 +20,7 @@ local defaults = {
 
 M.config = vim.deepcopy(defaults)
 
+local thinking_choices = { "off", "minimal", "low", "medium", "high", "xhigh" }
 local thinking_levels = {
   off = true,
   minimal = true,
@@ -35,6 +36,17 @@ end
 
 local function trim(text)
   return (text:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function elapsed_text(start_time)
+  local hrtime = vim.uv and vim.uv.hrtime or vim.loop.hrtime
+  local seconds = (hrtime() - start_time) / 1e9
+
+  if seconds < 10 then
+    return string.format("%.1fs", seconds)
+  end
+
+  return string.format("%.0fs", seconds)
 end
 
 local function trim_blank_lines(lines)
@@ -157,7 +169,7 @@ local function split_replacement(text)
   return vim.split(text, "\n", { plain = true })
 end
 
-local function replace_selection(region, replacement)
+local function replace_selection(region, replacement, elapsed)
   if not vim.api.nvim_buf_is_valid(region.buf) then
     notify("The original buffer no longer exists.", vim.log.levels.ERROR)
     return
@@ -196,7 +208,7 @@ local function replace_selection(region, replacement)
     )
   end
 
-  notify("Selection replaced by Pi.")
+  notify("Selection replaced by Pi in " .. elapsed .. ".")
 end
 
 local function build_agent_prompt(region, request)
@@ -306,6 +318,7 @@ local function run_pi(region, request, model, thinking)
   local stderr = {}
   local prompt = build_agent_prompt(region, request)
   local cmd = pi_command(model, thinking)
+  local start_time = (vim.uv and vim.uv.hrtime or vim.loop.hrtime)()
 
   remember_command(cmd)
   notify("Sending selection to Pi...")
@@ -327,16 +340,21 @@ local function run_pi(region, request, model, thinking)
     end,
     on_exit = function(_, code)
       vim.schedule(function()
+        local elapsed = elapsed_text(start_time)
+
         if code ~= 0 then
           local err = trim(table.concat(stderr, "\n"))
-          notify("Pi failed" .. (err ~= "" and ": " .. err or "."), vim.log.levels.ERROR)
+          notify(
+            "Pi failed after " .. elapsed .. (err ~= "" and ": " .. err or "."),
+            vim.log.levels.ERROR
+          )
           return
         end
 
         local replacement = clean_output(table.concat(stdout, "\n"))
         if replacement == "" then
           local answer = vim.fn.confirm(
-            "Pi returned empty text. Delete the selection?",
+            "Pi returned empty text after " .. elapsed .. ". Delete the selection?",
             "&Delete\n&Cancel",
             2
           )
@@ -345,7 +363,7 @@ local function run_pi(region, request, model, thinking)
           end
         end
 
-        replace_selection(region, replacement)
+        replace_selection(region, replacement, elapsed)
       end)
     end,
   })
@@ -415,6 +433,14 @@ local function replace_field_line(buf, key, value)
   end
 
   vim.api.nvim_buf_set_lines(buf, 0, 0, false, { prefix .. " " .. value })
+end
+
+local function select_thinking(buf)
+  vim.ui.select(thinking_choices, { prompt = "Pi thinking" }, function(choice)
+    if choice and vim.api.nvim_buf_is_valid(buf) then
+      replace_field_line(buf, "thinking", choice)
+    end
+  end)
 end
 
 local function parse_models(output)
@@ -544,7 +570,7 @@ local function open_prompt(region)
   local lines = {
     "# Describe how Pi should rewrite the selected text.",
     "# Lines beginning with # are ignored.",
-    "# <C-s> submit | <C-l> choose model | normal <CR> submit | q cancel",
+    "# <C-s> submit | <C-l> model | <C-t> thinking | normal <CR> submit | q cancel",
     "model: " .. M.config.default_model,
     "thinking: " .. M.config.default_thinking,
     "",
@@ -566,6 +592,10 @@ local function open_prompt(region)
 
   vim.keymap.set({ "n", "i" }, "<C-l>", function()
     select_model(buf)
+  end, keymap_opts)
+
+  vim.keymap.set({ "n", "i" }, "<C-t>", function()
+    select_thinking(buf)
   end, keymap_opts)
 
   vim.keymap.set("n", "<CR>", function()

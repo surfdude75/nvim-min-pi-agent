@@ -76,11 +76,12 @@ In the popup:
 
 - edit `model:` to use another Pi model;
 - press `<C-l>` to select from `pi --list-models gpt`;
-- edit `thinking:` to change the reasoning level;
+- edit `thinking:` or press `<C-t>` to change the reasoning level;
 - press normal mode `<CR>` to submit;
 - press normal mode `q` or `<Esc>` to cancel.
 
 If `<C-s>` is captured by your terminal, use normal mode `<CR>` instead.
+The success or failure notification includes the elapsed Pi request time.
 
 ## Commands
 
