@@ -172,15 +172,6 @@ selected model provider.
 
 ## Troubleshooting
 
-### `No API key found for azure-openai-responses`
-
-Use a provider-qualified model name, for example
-`openai-codex/gpt-5.5`. A bare model name such as `gpt-5.5` may match another
-Pi provider before the provider you use.
-
-If you copied an older config, update your LazyVim spec so it does not override
-the plugin default with `default_model = "gpt-5.5"`.
-
 To compare the command used by the default model and the model picker, run:
 
 ```vim
@@ -192,11 +183,6 @@ Then try both flows and inspect `:messages`. You can also rerun:
 ```vim
 :MinPiAIShowLastCommand
 ```
-
-### `Make a visual selection first`
-
-Use the `mode = "x"` command mapping shown above. It lets Neovim finish the
-visual selection before the plugin reads it.
 
 ## Current limits
 
