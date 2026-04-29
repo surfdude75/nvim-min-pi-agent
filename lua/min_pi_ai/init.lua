@@ -101,6 +101,18 @@ local function is_visual_mode(mode)
   return mode == "v" or mode == "V" or mode == "\022"
 end
 
+local function stop_insert()
+  pcall(vim.cmd, "stopinsert")
+end
+
+local function restore_editor(region)
+  stop_insert()
+
+  if region and region.win and vim.api.nvim_win_is_valid(region.win) then
+    pcall(vim.api.nvim_set_current_win, region.win)
+  end
+end
+
 local function get_selection()
   local buf = vim.api.nvim_get_current_buf()
   local start_pos = vim.fn.getpos("'<")
@@ -129,6 +141,7 @@ local function get_selection()
 
   local region = {
     buf = buf,
+    win = vim.api.nvim_get_current_win(),
     mode = mode,
     start_row = start_row,
     start_col = start_col,
@@ -206,6 +219,23 @@ local function replace_selection(region, replacement, elapsed)
       region.end_col,
       lines
     )
+  end
+
+  restore_editor(region)
+  if region.win and vim.api.nvim_win_is_valid(region.win) then
+    local line = vim.api.nvim_buf_get_lines(
+      region.buf,
+      region.start_row,
+      region.start_row + 1,
+      false
+    )[1]
+    if line then
+      pcall(
+        vim.api.nvim_win_set_cursor,
+        region.win,
+        { region.start_row + 1, math.min(region.start_col, #line) }
+      )
+    end
   end
 
   notify("Selection replaced by Pi in " .. elapsed .. ".")
@@ -526,6 +556,8 @@ local function window_size()
 end
 
 local function close_prompt(state)
+  stop_insert()
+
   if state.win and vim.api.nvim_win_is_valid(state.win) then
     vim.api.nvim_win_close(state.win, true)
   end
@@ -533,6 +565,8 @@ local function close_prompt(state)
   if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
     vim.api.nvim_buf_delete(state.buf, { force = true })
   end
+
+  restore_editor(state.region)
 end
 
 local function submit_prompt(state)
