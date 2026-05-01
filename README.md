@@ -1,7 +1,7 @@
 # nvim-min-pi-agent
 
 A tiny Neovim plugin that asks the local `pi` CLI to rewrite the current
-visual selection.
+visual selection or copy a compact file reference for another agent.
 
 The goal is small, localized edits with little context and easy-to-read code.
 The plugin sends Pi only:
@@ -60,6 +60,12 @@ return {
         mode = "x",
         desc = "Pi edit selection",
       },
+      {
+        "<leader>ar",
+        ":<C-u>MinPiAgentCopySelectionReference<CR>",
+        mode = "x",
+        desc = "Pi copy selection reference",
+      },
     },
   },
 }
@@ -89,9 +95,24 @@ Neovim process. Restarting Neovim resets them to the configured defaults.
 If the original buffer changes while Pi is working, the replacement is
 cancelled. This avoids applying stale output over text that you already edited.
 
+To copy a reference for another agent instead of editing:
+
+1. Select text in visual mode.
+2. Press `<leader>ar`.
+
+The plugin copies text such as `file lua/min_pi_agent/init.lua#125-185`.
+The file path is relative to the highest parent directory that contains
+`AGENTS.md`.
+
+By default, the plugin copies the reference to the unnamed register and, when
+available, the system clipboard. You can also use
+`:MinPiAgentCopySelectionReference a` to target a specific register.
+
 ## Commands
 
 - `:MinPiAgentEditSelection` edits the current visual selection.
+- `:MinPiAgentCopySelectionReference [register]` copies a
+  `file path#lines` reference for the current visual selection.
 - `:MinPiAgentCheck` checks that the `pi` command is available.
 - `:MinPiAgentLogin` opens Pi in a terminal split so you can run `/login`.
 - `:MinPiAgentLogCommand on` logs the exact Pi command before each request.
@@ -108,6 +129,7 @@ require("min_pi_agent").setup({
   pi_cmd = "pi",
   extra_args = {},
   keymap = nil,
+  reference_keymap = "<leader>ar",
   model_list_search = "gpt",
   strip_trailing_newline = true,
   log_cmd = false,
@@ -143,13 +165,16 @@ require("min_pi_agent").setup({
 })
 ```
 
-You can also set the visual keymap from setup:
+You can also set the visual keymaps from setup:
 
 ```lua
 require("min_pi_agent").setup({
   keymap = "<leader>as",
+  reference_keymap = "<leader>ar",
 })
 ```
+
+Set `reference_keymap = nil` to disable the built-in reference mapping.
 
 LazyVim users usually prefer the `keys` section in the plugin spec.
 

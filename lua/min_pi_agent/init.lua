@@ -7,6 +7,7 @@ local defaults = {
   pi_cmd = "pi",
   extra_args = {},
   keymap = nil,
+  reference_keymap = "<leader>ar",
   model_list_search = "gpt",
   strip_trailing_newline = true,
   log_cmd = false,
@@ -187,6 +188,75 @@ local function get_selection()
   return region
 end
 
+local function line_range(region)
+  return string.format("%d-%d", region.start_row + 1, region.end_row + 1)
+end
+
+local function path_exists(path)
+  local uv = vim.uv or vim.loop
+  return uv.fs_stat(path) ~= nil
+end
+
+local function path_join(dir, name)
+  if dir:sub(-1) == "/" then
+    return dir .. name
+  end
+
+  return dir .. "/" .. name
+end
+
+local function find_agents_root(path)
+  local dir = vim.fs.dirname(vim.fs.normalize(path))
+  local root
+
+  if path_exists(path_join(dir, "AGENTS.md")) then
+    root = dir
+  end
+
+  for parent in vim.fs.parents(dir) do
+    if path_exists(path_join(parent, "AGENTS.md")) then
+      root = parent
+    end
+  end
+
+  return root
+end
+
+local function relative_to_root(path, root)
+  local normalized_path = vim.fs.normalize(path)
+  local normalized_root = vim.fs.normalize(root)
+  local prefix = normalized_root
+
+  if prefix:sub(-1) ~= "/" then
+    prefix = prefix .. "/"
+  end
+
+  if normalized_path:sub(1, #prefix) == prefix then
+    return normalized_path:sub(#prefix + 1)
+  end
+
+  return normalized_path
+end
+
+local function build_selection_reference(region)
+  if region.filename == "" then
+    notify("Save the buffer before copying a reference.", vim.log.levels.WARN)
+    return nil
+  end
+
+  local root = find_agents_root(region.filename)
+  if not root then
+    notify("Could not find an AGENTS.md parent for this file.", vim.log.levels.WARN)
+    return nil
+  end
+
+  return "file " .. relative_to_root(region.filename, root) .. "#" .. line_range(region)
+end
+
+local function set_register(name, value)
+  return pcall(vim.fn.setreg, name, value, "v")
+end
+
 local function split_replacement(text)
   return vim.split(text, "\n", { plain = true })
 end
@@ -273,7 +343,7 @@ end
 local function build_agent_prompt(region, request)
   local file = region.filename ~= "" and region.filename or "[No Name]"
   local filetype = region.filetype ~= "" and region.filetype or "text"
-  local line_range = string.format("%d-%d", region.start_row + 1, region.end_row + 1)
+  local selected_lines = line_range(region)
   local lines = agent_prompt_lines()
 
   vim.list_extend(lines, {
@@ -283,7 +353,7 @@ local function build_agent_prompt(region, request)
     "",
     "File: " .. file,
     "Filetype: " .. filetype,
-    "Selected lines: " .. line_range,
+    "Selected lines: " .. selected_lines,
     "",
     "<selection>",
     region.text,
@@ -688,18 +758,68 @@ local function open_prompt(region)
   vim.cmd("startinsert")
 end
 
-function M.edit_selection()
+local function with_selection(action)
   if is_visual_mode(vim.fn.mode()) then
     local esc = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
     vim.api.nvim_feedkeys(esc, "nx", false)
-    vim.schedule(M.edit_selection)
+    vim.schedule(function()
+      with_selection(action)
+    end)
     return
   end
 
   local region = get_selection()
   if region then
-    open_prompt(region)
+    action(region)
   end
+end
+
+function M.copy_selection_reference(register)
+  register = trim(register or "")
+  if register == '"' then
+    register = ""
+  elseif register ~= "" and #register > 1 then
+    notify("Use a single register name, such as a, +, or *.", vim.log.levels.WARN)
+    return
+  end
+
+  with_selection(function(region)
+    local reference = build_selection_reference(region)
+    if not reference then
+      return
+    end
+
+    local targets = {}
+
+    if register ~= "" then
+      if not set_register(register, reference) then
+        notify("Could not copy to register " .. register .. ".", vim.log.levels.ERROR)
+        return
+      end
+
+      set_register('"', reference)
+      table.insert(targets, "register " .. register)
+    else
+      if set_register("+", reference) then
+        table.insert(targets, "clipboard (+)")
+      elseif set_register("*", reference) then
+        table.insert(targets, "clipboard (*)")
+      end
+
+      if not set_register('"', reference) then
+        notify("Could not copy to the unnamed register.", vim.log.levels.ERROR)
+        return
+      end
+
+      table.insert(targets, 1, 'register "')
+    end
+
+    notify("Copied selection reference to " .. table.concat(targets, " and ") .. ":\n" .. reference)
+  end)
+end
+
+function M.edit_selection()
+  with_selection(open_prompt)
 end
 
 function M.check()
@@ -753,6 +873,21 @@ function M.set_command_logging(value)
   notify("Pi command logging " .. (M.config.log_cmd and "enabled." or "disabled."))
 end
 
+local function set_visual_keymap(slot, lhs, rhs, desc)
+  M._visual_keymaps = M._visual_keymaps or {}
+
+  local previous = M._visual_keymaps[slot]
+  if previous and previous ~= lhs then
+    pcall(vim.keymap.del, "x", previous)
+  end
+
+  if lhs then
+    vim.keymap.set("x", lhs, rhs, { desc = desc })
+  end
+
+  M._visual_keymaps[slot] = lhs
+end
+
 function M.setup(opts)
   opts = opts or {}
 
@@ -768,6 +903,15 @@ function M.setup(opts)
   vim.api.nvim_create_user_command("MinPiAgentEditSelection", function()
     M.edit_selection()
   end, { desc = "Rewrite the visual selection with Pi", range = true, force = true })
+
+  vim.api.nvim_create_user_command("MinPiAgentCopySelectionReference", function(args)
+    M.copy_selection_reference(args.args)
+  end, {
+    desc = "Copy a file#line reference for the visual selection",
+    force = true,
+    nargs = "?",
+    range = true,
+  })
 
   vim.api.nvim_create_user_command("MinPiAgentCheck", function()
     M.check()
@@ -792,14 +936,15 @@ function M.setup(opts)
     nargs = "?",
   })
 
-  if M.config.keymap then
-    vim.keymap.set(
-      "x",
-      M.config.keymap,
-      ":<C-u>MinPiAgentEditSelection<CR>",
-      { desc = "Pi edit selection" }
-    )
-  end
+  set_visual_keymap("edit", M.config.keymap, M.edit_selection, "Pi edit selection")
+  set_visual_keymap(
+    "reference",
+    M.config.reference_keymap,
+    function()
+      M.copy_selection_reference(vim.v.register)
+    end,
+    "Pi copy selection reference"
+  )
 end
 
 return M
